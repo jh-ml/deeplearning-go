@@ -8,13 +8,12 @@ import (
 	"time"
 )
 
-func (nn *NeuralNetwork) SaveModel(configPath string, name, datasetName string, totalLoss float64) error {
+func (nn *NeuralNetwork) SaveModel(configPath string, name, datasetName string) error {
 	model := m.Model{
 		Metadata: m.Metadata{
 			Name:         name,
 			CreationDate: time.Now(),
 			ID:           uuid.New().String(),
-			TotalLoss:    totalLoss,
 			DatasetName:  datasetName,
 		},
 	}

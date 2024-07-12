@@ -6,7 +6,6 @@ type Metadata struct {
 	Name         string    `json:"name"`
 	CreationDate time.Time `json:"creation_date"`
 	ID           string    `json:"id"`
-	TotalLoss    float64   `json:"total_loss"`
 	DatasetName  string    `json:"dataset_name"`
 }
 

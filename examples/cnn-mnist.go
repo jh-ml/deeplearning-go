@@ -38,11 +38,11 @@ func ConvNet() {
 	)
 
 	epochs := 10
-	totalLoss := nn.Train(trainImages, trainLabels, epochs)
+	nn.Train(trainImages, trainLabels, epochs)
 
 	modelFilename := "Conv2D_model_config.json"
 	// Save the model
-	if err := nn.SaveModel(modelFilename, "Conv2D", "MNIST", totalLoss); err != nil {
+	if err := nn.SaveModel(modelFilename, "Conv2D", "MNIST"); err != nil {
 		fmt.Println("Error saving model:", err)
 		return
 	}

@@ -34,12 +34,12 @@ func ThreeLayer() {
 		regularisation.NewL2Regulariser(0.1))
 
 	epochs := 100
-	totalLoss := nn.Train(trainImages, trainLabels, epochs)
+	nn.Train(trainImages, trainLabels, epochs)
 
 	modelFilename := "ThreeLayer_model_config.json"
 
 	// Save the model
-	if err := nn.SaveModel(modelFilename, "ThreeLayer", "MNIST", totalLoss); err != nil {
+	if err := nn.SaveModel(modelFilename, "ThreeLayer", "MNIST"); err != nil {
 		fmt.Println("Error saving model:", err)
 		return
 	}

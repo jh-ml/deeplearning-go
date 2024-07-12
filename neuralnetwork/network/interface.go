@@ -13,7 +13,7 @@ type Interface interface {
 	Regularise()
 	ZeroGradients()
 	Optimise()
-	Train(data, targets []tensor.Interface, epochs int) float64
+	Train(data, targets []tensor.Interface, epochs int)
 	Predict(input tensor.Interface) tensor.Interface
-	SaveModel(configPath string, name, datasetName string, totalLoss float64) error
+	SaveModel(configPath string, name, datasetName string) error
 }

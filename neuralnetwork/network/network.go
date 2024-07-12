@@ -58,8 +58,7 @@ func (nn *NeuralNetwork) Backward(grad tensor.Interface) tensor.Interface {
 }
 
 // Train trains the network
-func (nn *NeuralNetwork) Train(data, targets []tensor.Interface, epochs int) float64 {
-	var totalLoss float64
+func (nn *NeuralNetwork) Train(data, targets []tensor.Interface, epochs int) {
 	for epoch := 0; epoch < epochs; epoch++ {
 		var epochLoss float64
 		for i := 0; i < len(data); i++ {
@@ -72,10 +71,8 @@ func (nn *NeuralNetwork) Train(data, targets []tensor.Interface, epochs int) flo
 			nn.ZeroGradients()
 		}
 		epochLoss /= float64(len(data)) // Average the loss over the number of samples
-		totalLoss += epochLoss          // Accumulate the averaged loss
 		fmt.Printf("Epoch %d, Loss: %f\n", epoch, epochLoss)
 	}
-	return totalLoss
 }
 
 func (nn *NeuralNetwork) Predict(input tensor.Interface) tensor.Interface {
