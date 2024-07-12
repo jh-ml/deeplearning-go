@@ -81,7 +81,7 @@ func (nn *NeuralNetwork) Predict(input tensor.Interface) tensor.Interface {
 
 func (nn *NeuralNetwork) Regularise() {
 	for _, l := range nn.GetLayers() {
-		if !l.RequiresOptimisation() {
+		if !l.RequiresRegularisation() {
 			continue
 		}
 		weights := l.GetWeights()
