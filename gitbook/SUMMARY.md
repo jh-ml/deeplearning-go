@@ -1,0 +1,17 @@
+# Table of contents
+
+* [Deep Learning with Go](README.md)
+* [Neural Network Overview](neural-network-overview.md)
+* [Computation Overview](computation-overview.md)
+* [Neural Network Components](neural-network-components/README.md)
+  * [Tensor](neural-network-components/tensor.md)
+  * [Weights and Biases](neural-network-components/weights-and-biases.md)
+  * [Gradients](neural-network-components/gradients.md)
+  * [Loss Function](neural-network-components/loss-function.md)
+  * [Activation Function](neural-network-components/activation-function.md)
+  * [Regularisation](neural-network-components/regularisation.md)
+  * [Optimisation](neural-network-components/optimisation.md)
+* [Training and Predicting](training-and-predicting.md)
+* [Layer Types](layer-types.md)
+* [Final Thoughts](final-thoughts.md)
+* [Glossary](glossary.md)
