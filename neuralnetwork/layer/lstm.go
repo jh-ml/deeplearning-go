@@ -20,8 +20,9 @@ type LSTM struct {
 	dBf, dBi, dBc, dBo tensor.Interface
 
 	// Cache for backward pass
-	ft, it, gt, ot tensor.Interface
-	sigmoid, tanh  activation.Interface
+	ft, it, gt, ot           []tensor.Interface
+	hiddenStates, cellStates []tensor.Interface
+	sigmoid, tanh            activation.Interface
 }
 
 // NewLSTM creates a new LSTM layer
@@ -47,50 +48,81 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 }
 
 // Forward pass for LSTM
-func (l *LSTM) Forward(input tensor.Interface) tensor.Interface {
-	// Compute gates
-	l.ft = l.sigmoid.Forward(input.Dot(l.Wf).Add(l.H.Dot(l.Uf)).Add(l.Bf))
-	l.it = l.sigmoid.Forward(input.Dot(l.Wi).Add(l.H.Dot(l.Ui)).Add(l.Bi))
-	l.gt = l.tanh.Forward(input.Dot(l.Wc).Add(l.H.Dot(l.Uc)).Add(l.Bc))
-	l.ot = l.sigmoid.Forward(input.Dot(l.Wo).Add(l.H.Dot(l.Uo)).Add(l.Bo))
+func (l *LSTM) Forward(inputs []tensor.Interface) []tensor.Interface {
+	sequenceLength := len(inputs)
+	l.hiddenStates = make([]tensor.Interface, sequenceLength)
+	l.cellStates = make([]tensor.Interface, sequenceLength)
+	l.ft = make([]tensor.Interface, sequenceLength)
+	l.it = make([]tensor.Interface, sequenceLength)
+	l.gt = make([]tensor.Interface, sequenceLength)
+	l.ot = make([]tensor.Interface, sequenceLength)
 
-	// Update cell state and hidden state
-	l.C = l.ft.Multiply(l.C).Add(l.it.Multiply(l.gt))
-	l.H = l.ot.Multiply(l.tanh.Forward(l.C))
+	for t := 0; t < sequenceLength; t++ {
+		input := inputs[t]
 
-	return l.H
+		// Compute gates
+		l.ft[t] = l.sigmoid.Forward(input.Dot(l.Wf).Add(l.H.Dot(l.Uf)).Add(l.Bf))
+		l.it[t] = l.sigmoid.Forward(input.Dot(l.Wi).Add(l.H.Dot(l.Ui)).Add(l.Bi))
+		l.gt[t] = l.tanh.Forward(input.Dot(l.Wc).Add(l.H.Dot(l.Uc)).Add(l.Bc))
+		l.ot[t] = l.sigmoid.Forward(input.Dot(l.Wo).Add(l.H.Dot(l.Uo)).Add(l.Bo))
+
+		// Update cell state and hidden state
+		l.C = l.ft[t].Multiply(l.C).Add(l.it[t].Multiply(l.gt[t]))
+		l.H = l.ot[t].Multiply(l.tanh.Forward(l.C))
+
+		// Store states
+		l.hiddenStates[t] = l.H
+		l.cellStates[t] = l.C
+	}
+
+	return l.hiddenStates
 }
 
 // Backward pass for LSTM
-func (l *LSTM) Backward(dh tensor.Interface) tensor.Interface {
-	// Derivative of the loss with respect to the output gate
-	do := dh.Multiply(l.tanh.Forward(l.C)).Multiply(l.sigmoid.Backward(l.ot))
+func (l *LSTM) Backward(dh []tensor.Interface) []tensor.Interface {
+	sequenceLength := len(dh)
+	dhPrev := tensor.NewZerosTensor(l.H.Shape()) // Initialize previous hidden state gradient
+	dCPrev := tensor.NewZerosTensor(l.C.Shape()) // Initialize previous cell state gradient
+	dInputs := make([]tensor.Interface, sequenceLength)
 
-	// Derivative of the loss with respect to the cell state
-	dC := dh.Multiply(l.ot).Multiply(l.tanh.Backward(l.C)).Add(l.C.Multiply(l.ft))
+	for t := sequenceLength - 1; t >= 0; t-- {
+		dhCurrent := dh[t].Add(dhPrev).(*tensor.Tensor) // Ensure type is *Tensor
 
-	// Derivative of the loss with respect to the candidate memory cell
-	dg := dC.Multiply(l.it).Multiply(l.tanh.Backward(l.gt))
+		// Derivative of the loss with respect to the output gate
+		do := dhCurrent.Multiply(l.tanh.Forward(l.cellStates[t])).Multiply(l.sigmoid.Backward(l.ot[t])).(*tensor.Tensor)
 
-	// Derivative of the loss with respect to the input gate
-	di := dC.Multiply(l.gt).Multiply(l.sigmoid.Backward(l.it))
+		// Derivative of the loss with respect to the cell state
+		dC := dhCurrent.Multiply(l.ot[t]).Multiply(l.tanh.Backward(l.cellStates[t])).Add(dCPrev.Multiply(l.ft[t])).(*tensor.Tensor)
 
-	// Derivative of the loss with respect to the forget gate
-	df := dC.Multiply(l.C).Multiply(l.sigmoid.Backward(l.ft))
+		// Derivative of the loss with respect to the candidate memory cell
+		dg := dC.Multiply(l.it[t]).Multiply(l.tanh.Backward(l.gt[t])).(*tensor.Tensor)
 
-	// Compute gradients for weights and biases
-	l.dWo = l.H.Transpose().Dot(do)
-	l.dBo = do.SumAlongBatch()
-	l.dWc = l.H.Transpose().Dot(dg)
-	l.dBc = dg.SumAlongBatch()
-	l.dWi = l.H.Transpose().Dot(di)
-	l.dBi = di.SumAlongBatch()
-	l.dWf = l.H.Transpose().Dot(df)
-	l.dBf = df.SumAlongBatch()
+		// Derivative of the loss with respect to the input gate
+		di := dC.Multiply(l.gt[t]).Multiply(l.sigmoid.Backward(l.it[t])).(*tensor.Tensor)
 
-	// Compute gradient with respect to the input
-	dInput := do.Dot(l.Wo.Transpose()).Add(dg.Dot(l.Wc.Transpose())).Add(di.Dot(l.Wi.Transpose())).Add(df.Dot(l.Wf.Transpose()))
-	return dInput
+		// Derivative of the loss with respect to the forget gate
+		df := dC.Multiply(l.cellStates[t]).Multiply(l.sigmoid.Backward(l.ft[t])).(*tensor.Tensor)
+
+		// Compute gradients for weights and biases
+		l.dWo = l.dWo.Add(l.hiddenStates[t].Transpose().Dot(do)).(*tensor.Tensor)
+		l.dBo = l.dBo.Add(do.SumAlongBatch()).(*tensor.Tensor)
+		l.dWc = l.dWc.Add(l.hiddenStates[t].Transpose().Dot(dg)).(*tensor.Tensor)
+		l.dBc = l.dBc.Add(dg.SumAlongBatch()).(*tensor.Tensor)
+		l.dWi = l.dWi.Add(l.hiddenStates[t].Transpose().Dot(di)).(*tensor.Tensor)
+		l.dBi = l.dBi.Add(di.SumAlongBatch()).(*tensor.Tensor)
+		l.dWf = l.dWf.Add(l.hiddenStates[t].Transpose().Dot(df)).(*tensor.Tensor)
+		l.dBf = l.dBf.Add(df.SumAlongBatch()).(*tensor.Tensor)
+
+		// Compute gradient with respect to the input
+		dInput := do.Dot(l.Wo.Transpose()).Add(dg.Dot(l.Wc.Transpose())).Add(di.Dot(l.Wi.Transpose())).Add(df.Dot(l.Wf.Transpose())).(*tensor.Tensor)
+		dInputs[t] = dInput
+
+		// Update gradients for previous time step
+		dhPrev = do.Dot(l.Uo.Transpose()).Add(dg.Dot(l.Uc.Transpose())).Add(di.Dot(l.Ui.Transpose())).Add(df.Dot(l.Uf.Transpose())).(*tensor.Tensor)
+		dCPrev = dC.Multiply(l.ft[t]).(*tensor.Tensor) // Ensure the correct type
+	}
+
+	return dInputs
 }
 
 // GetWeights returns the weights of the LSTM layer
