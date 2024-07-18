@@ -23,7 +23,7 @@ This introduces the Weighted Sum, also known as the Dot Product. It is the accum
 
 When working with numerical ranges we often use the ranges of -1.0 to 1.0 or 0 to 1.0, because it acts as a fixed range, allowing normalisation, scaling etc. Neural networks use the critical component called an activation function, which enables/disables nodes in a network based on their value, like an on/off switch. Let's apply a common activation function used in hidden layers, $$tanh$$, to control the nodes activation.
 
-<figure><img src=".gitbook/assets/Computation - tanh.svg" alt="" width="563"><figcaption><p><span class="math">tanh</span>applied to the output node</p></figcaption></figure>
+<figure><img src=".gitbook/assets/Computation - tanh.svg" alt="" width="563"><figcaption><p><span class="math">tanh</span> applied to the output node</p></figcaption></figure>
 
 We will cover $$tanh$$ in detail later on, for now note how the result value was modified within range.\
 
@@ -39,7 +39,7 @@ Let's work through the calculations\
 **Variables:**
 
 * Input nodes: $$[0.7, 0.5, 0.3]$$
-* Weights from the input to hidden layers: $$[1.0, 0.8, 0.6, 0.4, 0.2, 0.0]$$
+* Weights from the input to hidden layer: $$[1.0, 0.8, 0.6, 0.4, 0.2, 0.0]$$
 * Weights from hidden to output layer: $$[0.3, 0.1]$$
 * Hidden layer activation: $$\tanh$$
 * Output layer activation: $$\sigma$$ (sigmoid)
