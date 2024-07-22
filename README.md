@@ -36,6 +36,12 @@ The framework has been designed with a modular structure in mind, allowing for t
   * Root Mean Square Propagation (RMSProp)
   * Adaptive momentum (ADAM)
 
+### Examples
+
+The examples are currently showing how to set up a neural network with layers etc.
+The ThreeLayer example is running from main() at the moment. The MNIST dataset has
+been stored in the /data directory for testing purposes.
+
 ### Future Work
 
 * GPU processing using Metal on MacOS, using C via Go.
