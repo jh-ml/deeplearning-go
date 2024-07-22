@@ -20,9 +20,9 @@ type LSTM struct {
 	dBf, dBi, dBc, dBo tensor.Interface
 
 	// Cache for backward pass
-	ft, it, gt, ot           []tensor.Interface
-	hiddenStates, cellStates []tensor.Interface
-	sigmoid, tanh            activation.Interface
+	ft, it, gt, ot                   []tensor.Interface
+	inputs, hiddenStates, cellStates []tensor.Interface
+	sigmoid, tanh                    activation.Interface
 }
 
 // NewLSTM creates a new LSTM layer
@@ -48,8 +48,10 @@ func NewLSTM(inputSize, hiddenSize int) *LSTM {
 }
 
 // Forward pass for LSTM
-func (l *LSTM) Forward(inputs []tensor.Interface) []tensor.Interface {
-	sequenceLength := len(inputs)
+func (l *LSTM) Forward(input tensor.Interface) tensor.Interface {
+	sequenceLength := input.Shape()[0] // Assuming the first dimension is the sequence length
+
+	l.inputs = make([]tensor.Interface, sequenceLength) // Initialize to store inputs for backward pass
 	l.hiddenStates = make([]tensor.Interface, sequenceLength)
 	l.cellStates = make([]tensor.Interface, sequenceLength)
 	l.ft = make([]tensor.Interface, sequenceLength)
@@ -58,13 +60,16 @@ func (l *LSTM) Forward(inputs []tensor.Interface) []tensor.Interface {
 	l.ot = make([]tensor.Interface, sequenceLength)
 
 	for t := 0; t < sequenceLength; t++ {
-		input := inputs[t]
+		// Extract the slice for the current time step
+		inputT := input.Slice(t, 0) // Slice along the first dimension (time step)
+
+		l.inputs[t] = inputT // Store the input slice for backward pass
 
 		// Compute gates
-		l.ft[t] = l.sigmoid.Forward(input.Dot(l.Wf).Add(l.H.Dot(l.Uf)).Add(l.Bf))
-		l.it[t] = l.sigmoid.Forward(input.Dot(l.Wi).Add(l.H.Dot(l.Ui)).Add(l.Bi))
-		l.gt[t] = l.tanh.Forward(input.Dot(l.Wc).Add(l.H.Dot(l.Uc)).Add(l.Bc))
-		l.ot[t] = l.sigmoid.Forward(input.Dot(l.Wo).Add(l.H.Dot(l.Uo)).Add(l.Bo))
+		l.ft[t] = l.sigmoid.Forward(inputT.Dot(l.Wf).Add(l.H.Dot(l.Uf)).Add(l.Bf))
+		l.it[t] = l.sigmoid.Forward(inputT.Dot(l.Wi).Add(l.H.Dot(l.Ui)).Add(l.Bi))
+		l.gt[t] = l.tanh.Forward(inputT.Dot(l.Wc).Add(l.H.Dot(l.Uc)).Add(l.Bc))
+		l.ot[t] = l.sigmoid.Forward(inputT.Dot(l.Wo).Add(l.H.Dot(l.Uo)).Add(l.Bo))
 
 		// Update cell state and hidden state
 		l.C = l.ft[t].Multiply(l.C).Add(l.it[t].Multiply(l.gt[t]))
@@ -75,18 +80,24 @@ func (l *LSTM) Forward(inputs []tensor.Interface) []tensor.Interface {
 		l.cellStates[t] = l.C
 	}
 
-	return l.hiddenStates
+	// Concatenate hidden states to return as a single tensor
+	return tensor.Concatenate(l.hiddenStates)
 }
 
 // Backward pass for LSTM
-func (l *LSTM) Backward(dh []tensor.Interface) []tensor.Interface {
-	sequenceLength := len(dh)
-	dhPrev := tensor.NewZerosTensor(l.H.Shape()) // Initialize previous hidden state gradient
-	dCPrev := tensor.NewZerosTensor(l.C.Shape()) // Initialize previous cell state gradient
-	dInputs := make([]tensor.Interface, sequenceLength)
+func (l *LSTM) Backward(grad tensor.Interface) tensor.Interface {
+	sequenceLength := len(l.cellStates)
+	inputShape := l.inputs[0].Shape()                     // Use the shape of the stored inputs
+	dhPrev := tensor.NewZerosTensor(l.H.Shape())          // Initialize previous hidden state gradient
+	dCPrev := tensor.NewZerosTensor(l.C.Shape())          // Initialize previous cell state gradient
+	combinedGradient := tensor.NewZerosTensor(inputShape) // Initialize the combined gradient
+
+	// Ensure grad is a tensor and has the correct shape
+	dh := grad.(*tensor.Tensor) // Ensure type is *tensor.Tensor
 
 	for t := sequenceLength - 1; t >= 0; t-- {
-		dhCurrent := dh[t].Add(dhPrev).(*tensor.Tensor) // Ensure type is *Tensor
+		// Extract gradient for the current time step
+		dhCurrent := dh.Slice(t, 0).Add(dhPrev).(*tensor.Tensor) // Ensure type is *tensor.Tensor
 
 		// Derivative of the loss with respect to the output gate
 		do := dhCurrent.Multiply(l.tanh.Forward(l.cellStates[t])).Multiply(l.sigmoid.Backward(l.ot[t])).(*tensor.Tensor)
@@ -113,16 +124,16 @@ func (l *LSTM) Backward(dh []tensor.Interface) []tensor.Interface {
 		l.dWf = l.dWf.Add(l.hiddenStates[t].Transpose().Dot(df)).(*tensor.Tensor)
 		l.dBf = l.dBf.Add(df.SumAlongBatch()).(*tensor.Tensor)
 
-		// Compute gradient with respect to the input
+		// Compute gradient with respect to the input and accumulate
 		dInput := do.Dot(l.Wo.Transpose()).Add(dg.Dot(l.Wc.Transpose())).Add(di.Dot(l.Wi.Transpose())).Add(df.Dot(l.Wf.Transpose())).(*tensor.Tensor)
-		dInputs[t] = dInput
+		combinedGradient = combinedGradient.Add(dInput).(*tensor.Tensor)
 
 		// Update gradients for previous time step
 		dhPrev = do.Dot(l.Uo.Transpose()).Add(dg.Dot(l.Uc.Transpose())).Add(di.Dot(l.Ui.Transpose())).Add(df.Dot(l.Uf.Transpose())).(*tensor.Tensor)
 		dCPrev = dC.Multiply(l.ft[t]).(*tensor.Tensor) // Ensure the correct type
 	}
 
-	return dInputs
+	return combinedGradient
 }
 
 // GetWeights returns the weights of the LSTM layer

@@ -14,6 +14,7 @@ type Interface interface {
 	Transpose() Interface
 	Sum() float64
 	Add(other Interface) Interface
+	Slice(index int, axis int) Interface
 	Subtract(other Interface) Interface
 	Multiply(other Interface) Interface
 	Divide(other Interface) Interface

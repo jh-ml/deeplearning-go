@@ -152,6 +152,29 @@ func (t *Tensor) Add(other Interface) Interface {
 	return NewTensor(result, t.shape)
 }
 
+func (t *Tensor) Slice(index int, axis int) Interface {
+	shape := t.Shape()
+	if axis < 0 || axis >= len(shape) {
+		panic("Invalid axis for slicing")
+	}
+
+	// Compute the new shape after slicing
+	newShape := append([]int{}, shape[:axis]...)
+	newShape = append(newShape, shape[axis+1:]...)
+
+	// Compute the offset for the slice
+	stride := 1
+	for i := axis + 1; i < len(shape); i++ {
+		stride *= shape[i]
+	}
+	offset := index * stride
+
+	// Extract the slice data
+	sliceData := t.Data()[offset : offset+stride]
+
+	return NewTensor(sliceData, newShape)
+}
+
 func (t *Tensor) Subtract(other Interface) Interface {
 	otherData := other.Data()
 	if !t.SameShape(other) {
